@@ -1,14 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Secure Image Search</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    #search {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    #result {
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      max-height: 300px;
+      overflow-y: auto;
+      border-radius: 4px;
+    }
+    .item {
+      padding: 10px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .item:hover {
+      background-color: #f0f0f0;
+    }
+    .item img {
+      width: 50px;
+      height: 50px;
+      object-fit: cover;
+      border-radius: 50%;
+      border: 1px solid #ddd;
+    }
+    .selected-info {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #aaa;
+      border-radius: 6px;
+      background-color: #fafafa;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .selected-info img {
+      width: 100px;
+      height: 100px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    .selected-info div {
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
   <h2>Search by Name</h2>
-  <input type="text" id="search" placeholder="Type a name...">
+  <input type="text" id="search" placeholder="Type a name..." autocomplete="off" />
   <div id="result"></div>
+  <div id="selected" class="selected-info" style="display:none;"></div>
 
-  <script src="script.js"></script>
+  <script>
+    const searchInput = document.getElementById('search');
+    const resultDiv = document.getElementById('result');
+    const selectedDiv = document.getElementById('selected');
+
+    // Replace this with your actual logic to get image URL from prn or unique id
+    function getImageUrl(entry) {
+      // Example: images are stored in /images folder and filename is last part of link or prn.jpg
+      // If you have mapping, use that here
+      // For demo, just placeholder
+      return entry.url;
+    }
+
+    // Debounce function to limit API calls while typing
+    function debounce(func, delay) {
+      let timeout;
+      return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+      };
+    }
+
+    async function search(query) {
+      if (!query) {
+        resultDiv.innerHTML = '';
+        selectedDiv.style.display = 'none';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/search?q=${encodeURIComponent(query)}`);
+        if (!res.ok) {
+          resultDiv.innerHTML = '<p>No results found</p>';
+          selectedDiv.style.display = 'none';
+          return;
+        }
+
+        const data = await res.json();
+
+        resultDiv.innerHTML = data
+          .map(
+            entry => `
+              <div class="item" data-prn="${entry.prn}" data-name="${entry.name}" data-link="${entry.link || ''}">
+                <img src="${getImageUrl(entry)}" alt="Photo of ${entry.name}" onerror="this.src='placeholder.png'"/>
+                <span>${entry.name} <small>(${entry.prn})</small></span>
+              </div>`
+          )
+          .join('');
+
+        // Attach click event to each item
+        document.querySelectorAll('.item').forEach(item => {
+          item.addEventListener('click', () => {
+            const prn = item.getAttribute('data-prn');
+            const name = item.getAttribute('data-name');
+            const link = item.getAttribute('data-link');
+
+            selectedDiv.style.display = 'flex';
+            selectedDiv.innerHTML = `
+              <img src="${getImageUrl({ prn, link })}" alt="Photo of ${name}" onerror="this.src='images/placeholder.png'" />
+              <div>${name} <br> <small>PRN: ${prn}</small></div>
+            `;
+
+            resultDiv.innerHTML = '';  // Clear dropdown after selection
+            searchInput.value = name;  // Set input to selected name
+          });
+        });
+      } catch (err) {
+        resultDiv.innerHTML = '<p>Error fetching results</p>';
+        selectedDiv.style.display = 'none';
+      }
+    }
+
+    searchInput.addEventListener(
+      'input',
+      debounce((e) => {
+        search(e.target.value.trim());
+      }, 300)
+    );
+  </script>
 </body>
 </html>
