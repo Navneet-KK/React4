@@ -14,10 +14,10 @@ app.get('/search', (req, res) => {
   const query = (req.query.q || '').toLowerCase().trim();
   if (!query) return res.status(400).json({ error: 'Empty query' });
 
-  const queryWords = query.split(/\s+/); // split search terms
+  const queryWords = query.split(/\s+/); // ['doe', 'john']
 
   const matches = data.filter(entry => {
-    const nameWords = entry.name.toLowerCase().split(/\s+/);
+    const nameWords = entry.name.toLowerCase().split(/\s+/); // ['john', 'doe']
     return queryWords.every(qWord =>
       nameWords.some(nWord => nWord.includes(qWord))
     );
