@@ -2,87 +2,174 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Secure Image Search</title>
   <style>
+    :root {
+      --primary-color: #007bff;
+      --background-color: #fafafa;
+      --text-color: #333;
+      --border-color: #ccc;
+      --hover-bg: #f0f0f0;
+    }
+
+    [data-theme="dark"] {
+      --background-color: #121212;
+      --text-color: #ddd;
+      --border-color: #444;
+      --hover-bg: #333;
+    }
+
     body {
+      background-color: var(--background-color);
+      color: var(--text-color);
       font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
       max-width: 500px;
       margin: 40px auto;
-      padding: 0 20px;
+      padding: 0 15px;
+      box-sizing: border-box;
     }
+
     #search {
       width: 100%;
       padding: 10px;
       font-size: 16px;
       box-sizing: border-box;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: var(--background-color);
+      color: var(--text-color);
     }
+
+    #toggleTheme {
+      margin-top: 10px;
+      padding: 8px 12px;
+      font-size: 14px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
     #result {
       margin-top: 10px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--border-color);
       max-height: 300px;
       overflow-y: auto;
       border-radius: 4px;
+      scroll-behavior: smooth;
+      background-color: var(--background-color);
     }
+
     .item {
       padding: 10px;
       cursor: pointer;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       gap: 10px;
+      background-color: var(--background-color);
     }
+
     .item:hover {
-      background-color: #f0f0f0;
+      background-color: var(--hover-bg);
     }
+
     .item img {
       width: 50px;
       height: 50px;
       object-fit: cover;
       border-radius: 50%;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
+      flex-shrink: 0;
     }
+
     .selected-info {
       margin-top: 20px;
       padding: 15px;
-      border: 1px solid #aaa;
+      border: 1px solid var(--border-color);
       border-radius: 6px;
-      background-color: #fafafa;
+      background-color: var(--background-color);
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 15px;
+      justify-content: center;
+      text-align: center;
     }
+
     .selected-info img {
       width: 100px;
       height: 100px;
       border-radius: 8px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--border-color);
+      flex-shrink: 0;
     }
+
     .selected-info div {
       font-size: 18px;
       font-weight: bold;
+      word-break: break-word;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        margin: 20px 10px;
+        padding: 0 10px;
+      }
+      .item img {
+        width: 40px;
+        height: 40px;
+      }
+      .selected-info img {
+        width: 80px;
+        height: 80px;
+      }
+      .selected-info div {
+        font-size: 18px;
+      }
+      #search {
+        font-size: 14px;
+        padding: 8px;
+      }
     }
   </style>
 </head>
 <body>
-  <h2>Search by Name</h2>
-  <input type="text" id="search" placeholder="Type a name..." autocomplete="off" />
-  <div id="result"></div>
-  <div id="selected" class="selected-info" style="display:none;"></div>
+  <div class="container">
+    <h2>Search by Name</h2>
+    <input type="text" id="search" placeholder="Type a name..." autocomplete="off" />
+    <button id="toggleTheme" aria-label="Toggle dark mode">🌙 Dark Mode</button>
+    <div id="result" role="list"></div>
+    <div id="selected" class="selected-info" style="display:none;"></div>
+  </div>
 
   <script>
     const searchInput = document.getElementById('search');
     const resultDiv = document.getElementById('result');
     const selectedDiv = document.getElementById('selected');
 
-    // Replace this with your actual logic to get image URL from prn or unique id
+    let currentQuery = '';
+    let currentPage = 1;
+    let totalPages = 1;
+    let isLoading = false;
+
     function getImageUrl(entry) {
-      // Example: images are stored in /images folder and filename is last part of link or prn.jpg
-      // If you have mapping, use that here
-      // For demo, just placeholder
       return entry.url;
     }
 
-    // Debounce function to limit API calls while typing
     function debounce(func, delay) {
       let timeout;
       return (...args) => {
@@ -91,34 +178,50 @@
       };
     }
 
-    async function search(query) {
+    function makeItemsAccessible() {
+      document.querySelectorAll('.item').forEach(item => {
+        item.setAttribute('role', 'listitem');
+        item.setAttribute('tabindex', '0');
+        item.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            item.click();
+          }
+        });
+      });
+    }
+
+    async function search(query, page = 1) {
       if (!query) {
         resultDiv.innerHTML = '';
         selectedDiv.style.display = 'none';
         return;
       }
 
+      isLoading = true;
       try {
-        const res = await fetch(`/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`/search?q=${encodeURIComponent(query)}&page=${page}&limit=10`);
         if (!res.ok) {
-          resultDiv.innerHTML = '<p>No results found</p>';
-          selectedDiv.style.display = 'none';
+          if (page === 1) resultDiv.innerHTML = '<p>No results found</p>';
+          isLoading = false;
           return;
         }
 
         const data = await res.json();
+        currentPage = data.page;
+        totalPages = data.totalPages;
 
-        resultDiv.innerHTML = data
-          .map(
-            entry => `
-              <div class="item" data-prn="${entry.prn}" data-name="${entry.name}" data-link="${entry.link || ''}">
-                <img src="${getImageUrl(entry)}" alt="Photo of ${entry.name}" onerror="this.src='placeholder.png'"/>
-                <span>${entry.name} <small>(${entry.prn})</small></span>
-              </div>`
-          )
-          .join('');
+        if (page === 1) resultDiv.innerHTML = '';
 
-        // Attach click event to each item
+        resultDiv.innerHTML += data.results.map(entry => `
+          <div class="item"
+            data-prn="${entry.prn}"
+            data-name="${entry.name}"
+            data-link="${entry.url}">
+            <img src="${getImageUrl(entry)}" alt="Photo of ${entry.name}" onerror="this.src='placeholder.png'" />
+            <span>${entry.name} <small>(${entry.prn})</small></span>
+          </div>`).join('');
+
         document.querySelectorAll('.item').forEach(item => {
           item.addEventListener('click', () => {
             const prn = item.getAttribute('data-prn');
@@ -127,26 +230,42 @@
 
             selectedDiv.style.display = 'flex';
             selectedDiv.innerHTML = `
-              <img src="${getImageUrl({ prn, link })}" alt="Photo of ${name}" onerror="this.src='images/placeholder.png'" />
+              <img src="${link}" alt="Photo of ${name}" onerror="this.src='placeholder.png'" />
               <div>${name} <br> <small>PRN: ${prn}</small></div>
             `;
 
-            resultDiv.innerHTML = '';  // Clear dropdown after selection
-            searchInput.value = name;  // Set input to selected name
+            resultDiv.innerHTML = '';
+            searchInput.value = name;
           });
         });
+
+        makeItemsAccessible();
       } catch (err) {
-        resultDiv.innerHTML = '<p>Error fetching results</p>';
-        selectedDiv.style.display = 'none';
+        if (page === 1) resultDiv.innerHTML = '<p>Error fetching results</p>';
       }
+      isLoading = false;
     }
 
-    searchInput.addEventListener(
-      'input',
-      debounce((e) => {
-        search(e.target.value.trim());
-      }, 300)
-    );
+    searchInput.addEventListener('input', debounce((e) => {
+      currentQuery = e.target.value.trim();
+      currentPage = 1;
+      totalPages = 1;
+      search(currentQuery, 1);
+    }, 300));
+
+    document.getElementById('toggleTheme').addEventListener('click', () => {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? '' : 'dark');
+      document.getElementById('toggleTheme').textContent = isDark ? '🌙 Dark Mode' : '☀️ Light Mode';
+    });
+
+    resultDiv.addEventListener('scroll', () => {
+      if (!isLoading && currentQuery && currentPage < totalPages &&
+        resultDiv.scrollTop + resultDiv.clientHeight >= resultDiv.scrollHeight - 50) {
+        search(currentQuery, currentPage + 1);
+      }
+    });
   </script>
 </body>
 </html>
