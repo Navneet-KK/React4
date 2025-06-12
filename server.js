@@ -10,7 +10,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Load and merge data
 const data1 = JSON.parse(fs.readFileSync('data1.json'));
 const data2 = JSON.parse(fs.readFileSync('data2.json'));
-const data = [...data1, ...data2];
+const data3 = JSON.parse(fs.readFileSync('data3.json'));
+const data4 = JSON.parse(fs.readFileSync('data4.json'));
+const data = [...data1, ...data2, ...data3, ...data4];
 
 // Search route with pagination
 app.get('/search', (req, res) => {
