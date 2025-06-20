@@ -16,7 +16,11 @@ const data2013 = [
   ...JSON.parse(fs.readFileSync('data3.json')),
   ...JSON.parse(fs.readFileSync('data4.json'))
 ];
-const allData = [...data2021, ...data2013];
+const data2014 = [
+  ...JSON.parse(fs.readFileSync('data5.json')),
+  ...JSON.parse(fs.readFileSync('data6.json'))
+];
+const allData = [...data2021, ...data2013, ...data2014];
 
 // Search route with pagination
 app.get('/search', (req, res) => {
@@ -31,6 +35,7 @@ app.get('/search', (req, res) => {
   let sourceData;
   if (batch === '2021') sourceData = data2021;
   else if (batch === '2013') sourceData = data2013;
+  else if (batch === '2014') sourceData = data2014;
   else sourceData = allData;
 
   const queryWords = query.split(/\s+/);
